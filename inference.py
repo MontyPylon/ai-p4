@@ -145,11 +145,16 @@ class ExactInference(InferenceModule):
              captured).
         """
         noisyDistance = observation
+        if noisyDistance is None:
+            self.setGhostPosition(gameState, self.getJailPosition())
+            for p in self.legalPositions:
+                self.beliefs[p] = 0.0
+            self.beliefs[self.getJailPosition()] = 1.0
+            return
         emissionModel = busters.getObservationDistribution(noisyDistance)
         pacmanPosition = gameState.getPacmanPosition()
 
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
 
         # Replace this code with a correct observation update
         # Be sure to handle the "jail" edge case where the ghost is eaten
@@ -158,7 +163,7 @@ class ExactInference(InferenceModule):
         for p in self.legalPositions:
             trueDistance = util.manhattanDistance(p, pacmanPosition)
             if emissionModel[trueDistance] > 0:
-                allPossible[p] = 1.0
+                allPossible[p] = self.beliefs[p]*emissionModel[trueDistance]
 
         "*** END YOUR CODE HERE ***"
 
