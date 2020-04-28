@@ -117,7 +117,8 @@ class ExactInference(InferenceModule):
     def initializeUniformly(self, gameState):
         "Begin with a uniform distribution over ghost positions."
         self.beliefs = util.Counter()
-        for p in self.legalPositions: self.beliefs[p] = 1.0
+        for p in self.legalPositions:
+            self.beliefs[p] = 1.0
         self.beliefs.normalize()
 
     def observe(self, observation, gameState):
@@ -270,6 +271,9 @@ class ParticleFilter(InferenceModule):
         weight with each position) is incorrect and may produce errors.
         """
         "*** YOUR CODE HERE ***"
+        self.particles = []
+        particles_per = int(self.numParticles/len(self.legalPositions))
+        for p in self.legalPositions: self.particles.extend([p]*particles_per)
 
     def observe(self, observation, gameState):
         """
@@ -299,10 +303,33 @@ class ParticleFilter(InferenceModule):
         distance between a particle and Pacman's position.
         """
         noisyDistance = observation
+        if noisyDistance is None:
+            self.setGhostPosition(gameState, self.getJailPosition())
+            self.particles = [self.getJailPosition()]*self.numParticles
+            return
         emissionModel = busters.getObservationDistribution(noisyDistance)
         pacmanPosition = gameState.getPacmanPosition()
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+
+        allPossible = util.Counter()
+        for p in self.legalPositions:
+            trueDistance = util.manhattanDistance(p, pacmanPosition)
+            if emissionModel[trueDistance] > 0:
+                allPossible[p] = self.beliefs[p] * emissionModel[trueDistance]
+
+        allPossible.normalize()
+
+        flag = False
+        for p in allPossible:
+            if allPossible[p] != 0:
+                flag = True
+                break
+
+        self.particles = []
+        if flag:
+            for i in range(self.numParticles):
+                self.particles.append(util.sampleFromCounter(allPossible))
+        else:
+            self.initializeUniformly(gameState)
 
     def elapseTime(self, gameState):
         """
@@ -328,8 +355,17 @@ class ParticleFilter(InferenceModule):
         essentially converts a list of particles into a belief distribution (a
         Counter object)
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        self.beliefs = util.Counter()
+
+        if self.particles.count(self.getJailPosition()) == self.numParticles:
+            self.beliefs[self.getJailPosition()] = 1.0
+            return self.beliefs
+
+        for p in self.legalPositions:
+            self.beliefs[p] = float(self.particles.count(p))/float(self.numParticles)
+
+        return self.beliefs
+
 
 class MarginalInference(InferenceModule):
     """
