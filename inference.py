@@ -253,6 +253,9 @@ class ParticleFilter(InferenceModule):
     def __init__(self, ghostAgent, numParticles=300):
         InferenceModule.__init__(self, ghostAgent);
         self.setNumParticles(numParticles)
+        self.particles = []
+        self.numParticles = 0
+        self.beliefs = util.Counter()
 
     def setNumParticles(self, numParticles):
         self.numParticles = numParticles
@@ -271,9 +274,11 @@ class ParticleFilter(InferenceModule):
         weight with each position) is incorrect and may produce errors.
         """
         "*** YOUR CODE HERE ***"
-        self.particles = []
         particles_per = int(self.numParticles/len(self.legalPositions))
         for p in self.legalPositions: self.particles.extend([p]*particles_per)
+        for p in self.legalPositions:
+            if len(self.particles) != self.numParticles:
+                self.particles.append(p)
 
     def observe(self, observation, gameState):
         """
@@ -324,10 +329,9 @@ class ParticleFilter(InferenceModule):
                 flag = True
                 break
 
-        self.particles = []
         if flag:
-            for i in range(self.numParticles):
-                self.particles.append(util.sampleFromCounter(allPossible))
+            for i in range(len(self.particles)):
+                self.particles[i] = util.sampleFromCounter(allPossible)
         else:
             self.initializeUniformly(gameState)
 
@@ -346,7 +350,9 @@ class ParticleFilter(InferenceModule):
         a belief distribution.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        for i in range(len(self.particles)):
+            newPosDist = self.getPositionDistribution(self.setGhostPosition(gameState, self.particles[i]))
+            self.particles[i] = util.sampleFromCounter(newPosDist)
 
     def getBeliefDistribution(self):
         """
