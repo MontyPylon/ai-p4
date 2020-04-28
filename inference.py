@@ -253,9 +253,6 @@ class ParticleFilter(InferenceModule):
     def __init__(self, ghostAgent, numParticles=300):
         InferenceModule.__init__(self, ghostAgent);
         self.setNumParticles(numParticles)
-        self.particles = []
-        self.numParticles = 0
-        self.beliefs = util.Counter()
 
     def setNumParticles(self, numParticles):
         self.numParticles = numParticles
@@ -274,6 +271,7 @@ class ParticleFilter(InferenceModule):
         weight with each position) is incorrect and may produce errors.
         """
         "*** YOUR CODE HERE ***"
+        self.particles = []
         particles_per = int(self.numParticles/len(self.legalPositions))
         for p in self.legalPositions: self.particles.extend([p]*particles_per)
         for p in self.legalPositions:
@@ -316,24 +314,24 @@ class ParticleFilter(InferenceModule):
         pacmanPosition = gameState.getPacmanPosition()
 
         allPossible = util.Counter()
+        self.beliefs = self.getBeliefDistribution()
         for p in self.legalPositions:
             trueDistance = util.manhattanDistance(p, pacmanPosition)
             if emissionModel[trueDistance] > 0:
                 allPossible[p] = self.beliefs[p] * emissionModel[trueDistance]
 
         allPossible.normalize()
-
         flag = False
         for p in allPossible:
             if allPossible[p] != 0:
                 flag = True
                 break
-
         if flag:
             for i in range(len(self.particles)):
                 self.particles[i] = util.sampleFromCounter(allPossible)
         else:
             self.initializeUniformly(gameState)
+        self.beliefs = self.getBeliefDistribution()
 
     def elapseTime(self, gameState):
         """
@@ -362,14 +360,10 @@ class ParticleFilter(InferenceModule):
         Counter object)
         """
         self.beliefs = util.Counter()
-
-        if self.particles.count(self.getJailPosition()) == self.numParticles:
-            self.beliefs[self.getJailPosition()] = 1.0
-            return self.beliefs
-
         for p in self.legalPositions:
             self.beliefs[p] = float(self.particles.count(p))/float(self.numParticles)
-
+        if self.particles.count(self.getJailPosition()) == self.numParticles:
+            self.beliefs[self.getJailPosition()] = 1.0
         return self.beliefs
 
 
