@@ -414,6 +414,8 @@ class JointParticleFilter:
         self.numGhosts = gameState.getNumAgents() - 1
         self.ghostAgents = []
         self.legalPositions = legalPositions
+        self.allowedPositions = self.getRealPositions()
+        self.inJail = [0]*self.numGhosts
         self.initializeParticles()
 
     def initializeParticles(self):
@@ -492,12 +494,14 @@ class JointParticleFilter:
             return
         for i in range(len(noisyDistances)):
             if noisyDistances[i] is None:
-                for j in range(len(self.particles)):
-                    self.particles[j] = self.getParticleWithGhostInJail(self.particles[j], i)
+                if self.inJail[i] == 0:
+                    for j in range(len(self.particles)):
+                        self.particles[j] = self.getParticleWithGhostInJail(self.particles[j], i)
+                    self.inJail[i] = 1
         emissionModels = [busters.getObservationDistribution(dist) for dist in noisyDistances]
         beliefs = self.getBeliefDistribution()
         total = util.Counter()
-        for p in list(itertools.product(*self.getRealPositions())):
+        for p in list(itertools.product(*self.allowedPositions)):
             total[p] = beliefs[p]
             for i in range(self.numGhosts):
                 if noisyDistances[i] is not None:
@@ -563,6 +567,7 @@ class JointParticleFilter:
               self.ghostAgents[ghostIndex-1], but in this project all ghost
               agents are always the same.
         """
+
         newParticles = []
         for oldParticle in self.particles:
             newParticle = list(oldParticle) # A list of ghost positions
@@ -573,18 +578,13 @@ class JointParticleFilter:
                 newPosDist = getPositionDistributionForGhost(test, i, self.ghostAgents[i])
                 dist.append(util.sample(newPosDist))
             newParticle = dist
-            "*** YOUR CODE HERE ***"
-
-            "*** END YOUR CODE HERE ***"
             newParticles.append(tuple(newParticle))
         self.particles = newParticles
 
     def getBeliefDistribution(self):
         beliefs = util.Counter()
-        for p in list(itertools.product(*self.getRealPositions())):
+        for p in list(itertools.product(*self.allowedPositions)):
             beliefs[p] = float(self.particles.count(p)) / float(len(self.particles))
-        #print("marginal of ghost 0: ", self.printMarginal(0))
-        #print("marginal of ghost 1: ", self.printMarginal(1))
         return beliefs
 
     def getRealPositions(self):
