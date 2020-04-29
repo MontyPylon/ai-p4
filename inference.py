@@ -488,25 +488,26 @@ class JointParticleFilter:
             return
         for i in range(len(noisyDistances)):
             if noisyDistances[i] is None:
-                for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
-                    self.getParticleWithGhostInJail(p, i)
+                #for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
+                for j in range(len(self.particles)):
+                    self.particles[j] = self.getParticleWithGhostInJail(self.particles[j], i)
                 #self.setGhostPosition(gameState, self.getJailPosition())
                 return
         emissionModels = [busters.getObservationDistribution(dist) for dist in noisyDistances]
 
-        self.beliefs = self.getBeliefDistribution()
+        beliefs = self.getBeliefDistribution()
         total = util.Counter()
         for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
-            total[p] = self.beliefs[p]
+            total[p] = beliefs[p]
             for i in range(self.numGhosts):
                 trueDistance = util.manhattanDistance(p[i], pacmanPosition)
                 total[p] *= emissionModels[i][trueDistance]
         total.normalize()
+        if all(value == 0 for value in total.values()):
+            self.initializeParticles()
+            return
         for i in range(len(self.particles)):
-            if i >= len(self.particles):
-                print('what the')
             self.particles[i] = util.sampleFromCounter(total)
-        self.beliefs = self.getBeliefDistribution()
 
     def getParticleWithGhostInJail(self, particle, ghostIndex):
         """
@@ -573,12 +574,17 @@ class JointParticleFilter:
         self.particles = newParticles
 
     def getBeliefDistribution(self):
-        self.beliefs = util.Counter()
+        beliefs = util.Counter()
+
         for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
-            self.beliefs[p] = float(self.particles.count(p)) / float(self.numParticles)
-        #if self.particles.count(self.getJailPosition()) == self.numParticles:
-        #    self.beliefs[self.getJailPosition()] = 1.0
-        return self.beliefs
+            beliefs[p] = float(self.particles.count(p)) / float(self.numParticles)
+
+        for i in range(self.numGhosts):
+            for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts-1)):
+                new_pos = p.insert(p, i)
+                beliefs[new_pos] = float(self.particles.count(new_pos)) / float(self.numParticles)
+
+        return beliefs
 
 # One JointInference module is shared globally across instances of MarginalInference
 jointInference = JointParticleFilter()
