@@ -442,6 +442,9 @@ class JointParticleFilter:
         particles_per = int(self.numParticles / len(self.legalPositions)**self.numGhosts)
         for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
             self.particles.extend([p]*particles_per)
+        for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
+            if len(self.particles) != self.numParticles:
+                self.particles.append(p)
 
     def addGhostAgent(self, agent):
         """
@@ -484,24 +487,22 @@ class JointParticleFilter:
         """
         pacmanPosition = gameState.getPacmanPosition()
         noisyDistances = gameState.getNoisyGhostDistances()
+
         if len(noisyDistances) < self.numGhosts:
             return
         for i in range(len(noisyDistances)):
             if noisyDistances[i] is None:
-                #for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
                 for j in range(len(self.particles)):
                     self.particles[j] = self.getParticleWithGhostInJail(self.particles[j], i)
-                #self.setGhostPosition(gameState, self.getJailPosition())
-                return
         emissionModels = [busters.getObservationDistribution(dist) for dist in noisyDistances]
-
         beliefs = self.getBeliefDistribution()
         total = util.Counter()
-        for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
+        for p in list(itertools.product(*self.getRealPositions())):
             total[p] = beliefs[p]
             for i in range(self.numGhosts):
-                trueDistance = util.manhattanDistance(p[i], pacmanPosition)
-                total[p] *= emissionModels[i][trueDistance]
+                if noisyDistances[i] is not None:
+                    trueDistance = util.manhattanDistance(p[i], pacmanPosition)
+                    total[p] *= emissionModels[i][trueDistance]
         total.normalize()
         if all(value == 0 for value in total.values()):
             self.initializeParticles()
@@ -566,7 +567,12 @@ class JointParticleFilter:
         for oldParticle in self.particles:
             newParticle = list(oldParticle) # A list of ghost positions
             # now loop through and update each entry in newParticle...
-
+            dist = []
+            for i in range(len(newParticle)):
+                test = setGhostPositions(gameState, oldParticle)
+                newPosDist = getPositionDistributionForGhost(test, i, self.ghostAgents[i])
+                dist.append(util.sample(newPosDist))
+            newParticle = dist
             "*** YOUR CODE HERE ***"
 
             "*** END YOUR CODE HERE ***"
@@ -575,16 +581,29 @@ class JointParticleFilter:
 
     def getBeliefDistribution(self):
         beliefs = util.Counter()
-
-        for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts)):
-            beliefs[p] = float(self.particles.count(p)) / float(self.numParticles)
-
-        for i in range(self.numGhosts):
-            for p in list(itertools.product(self.legalPositions, repeat=self.numGhosts-1)):
-                new_pos = p.insert(p, i)
-                beliefs[new_pos] = float(self.particles.count(new_pos)) / float(self.numParticles)
-
+        for p in list(itertools.product(*self.getRealPositions())):
+            beliefs[p] = float(self.particles.count(p)) / float(len(self.particles))
+        #print("marginal of ghost 0: ", self.printMarginal(0))
+        #print("marginal of ghost 1: ", self.printMarginal(1))
         return beliefs
+
+    def getRealPositions(self):
+        all = []
+        for i in range(self.numGhosts):
+            pos = self.legalPositions[:]
+            jail = [self.getJailPosition(i)]
+            pos.extend(jail)
+            all.append(pos)
+        return all
+
+    def printMarginal(self, ghost):
+        jointDistribution = self.getBeliefDistribution()
+        dist = util.Counter()
+        for t, prob in jointDistribution.items():
+            dist[t[ghost - 1]] += prob
+        print("Ghost " + str(ghost) + str(": ") + str(dist))
+        #return dist
+
 
 # One JointInference module is shared globally across instances of MarginalInference
 jointInference = JointParticleFilter()
